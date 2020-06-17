@@ -31,8 +31,8 @@ jobs:
       - name: checkout source code
         uses: actions/checkout@v2
         
-      - name: Cache m2
-        id: cache m2
+      - name: Cache java dependency
+        id: cache java
         uses: actions/cache@v2
         with:
           path: ~/.m2/repository
