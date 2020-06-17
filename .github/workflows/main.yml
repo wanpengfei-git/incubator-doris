@@ -62,7 +62,7 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE
           bash run-fe-ut.sh
-        if: succeeded() || failed()
+        continue-on-error: true
       
       - name: Generate fe coverage report
         run: |
