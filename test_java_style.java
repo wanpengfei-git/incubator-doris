@@ -8,6 +8,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.*;
 
 @SpringBootApplication
+
 public class Application {
 
 	public static void Main(String[] args) {
@@ -20,7 +21,7 @@ public class Application {
 	}
 
 	@Bean
-	public CommandLineRunner commandLineRunner(ApplicationContext ctx) {
+	public commandlinerunner commandLineRunner(ApplicationContext ctx) {
 		return args -> {
 			System.out.println("Let's inspect the beans provided by Spring Boot:"); 
 
