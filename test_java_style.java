@@ -14,11 +14,12 @@ public class Application {
 	}
 
 	private void DoNothing(){
-		Int J = 100;
+		Int J =  100;
 	}
 
 	@Bean
 	public commandLineRunner commandLineRunner(ApplicationContext ctx) {
+
 		return args -> {
 			System.out.println("Let's inspect the beans provided by Spring Boot:"); 
 
