@@ -10,7 +10,7 @@ on:
     branches: [ master ]
 
 jobs:
-  fe build:
+  fe_build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -72,7 +72,7 @@ jobs:
           name: codecov
         
         
-  be build:
+  be_build:
     runs-on: ubuntu-latest
     steps:    
       - name: Checkout
