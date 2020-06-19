@@ -18,6 +18,10 @@ jobs:
  
       - name: Checkout
         uses: actions/checkout@v2
+      
+      - name: Run java checkstyle
+        uses: nikitasavinov/checkstyle-action@0.2.0
+
         
      # - name: check fe code style
       #  uses: nikitasavinov/checkstyle-action@master
