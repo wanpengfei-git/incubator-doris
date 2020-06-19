@@ -7,7 +7,7 @@ on:
   push:
     branches: [ master ]
   pull_request:
-    branches: [ master ]
+    branches: [ branch ]
 
 jobs:
   build:
@@ -18,12 +18,16 @@ jobs:
  
       - name: Checkout
         uses: actions/checkout@v2
+      
+      - name: Run java checkstyle
+        uses: nikitasavinov/checkstyle-action@0.2.0
+
         
-      - name: check fe code style
-        uses: nikitasavinov/checkstyle-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          workdir: $GITHUB_WORKSPACE/fe
+     # - name: check fe code style
+      #  uses: nikitasavinov/checkstyle-action@master
+      #  with:
+       #   github_token: ${{ secrets.GITHUB_TOKEN }}
+       #   workdir: $GITHUB_WORKSPACE/fe
       
       - name: install dependency
         run: sudo apt-get install g++ ant cmake zip byacc flex automake libtool binutils-dev libiberty-dev bison python2.7 libncurses5-dev lsb-release mlocate
