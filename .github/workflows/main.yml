@@ -19,8 +19,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
         
-      - name: check fe code style
-        uses: nikitasavinov/checkstyle-action@master
+      - name: Run java checkstyle
+        uses: nikitasavinov/checkstyle-action@0.2.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workdir: $GITHUB_WORKSPACE/fe
