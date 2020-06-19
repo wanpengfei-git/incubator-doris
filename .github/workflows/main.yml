@@ -10,17 +10,14 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
-
+  fe_build:
     runs-on: ubuntu-latest
-
     steps:
- 
       - name: Checkout
         uses: actions/checkout@v2
         
-      - name: check fe code style
-        uses: nikitasavinov/checkstyle-action@master
+      - name: Run java checkstyle
+        uses: nikitasavinov/checkstyle-action@0.2.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workdir: $GITHUB_WORKSPACE/fe
@@ -28,8 +25,6 @@ jobs:
       - name: install dependency
         run: sudo apt-get install g++ ant cmake zip byacc flex automake libtool binutils-dev libiberty-dev bison python2.7 libncurses5-dev lsb-release mlocate
       
-      - name: checkout source code
-        uses: actions/checkout@v2
         
       - name: Cache java dependency
         uses: actions/cache@v2
@@ -75,7 +70,25 @@ jobs:
           file: $GITHUB_WORKSPACE/fe/target/site/cobertura/*.html
           flags: unittests
           name: codecov
-          
+        
+        
+  be_build:
+    runs-on: ubuntu-latest
+    steps:    
+      - name: Checkout
+        uses: actions/checkout@v2 
+      
+      - name: install dependency
+        run: sudo apt-get install g++ ant cmake zip byacc flex automake libtool binutils-dev libiberty-dev bison python2.7 libncurses5-dev lsb-release mlocate
+      
+      - name: build thirdparty
+        run: |
+              export REPOSITORY_URL=https://doris-incubating-repo.bj.bcebos.com/thirdparty
+              export DORIS_HOME=$GITHUB_WORKSPACE
+              cd $GITHUB_WORKSPACE/
+              bash env.sh
+              bash thirdparty/concurrent-build-thirdparty.sh
+              
       - name: build be
         run: |
           cd $GITHUB_WORKSPACE
@@ -85,3 +98,4 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE
           bash run-ut.sh 
+        continue-on-error: true
