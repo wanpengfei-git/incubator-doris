@@ -269,6 +269,12 @@ FE 的配置项有两种方式进行配置：
 
 ### `enable_materialized_view`
 
+该配置用于开启和关闭创建物化视图功能。如果设置为 true，则创建物化视图功能开启。用户可以通过 `CREATE MATERIALIZED VIEW` 命令创建物化视图。如果设置为 false，则无法创建物化视图。
+
+如果在创建物化视图的时候报错 `The materialized view is coming soon` 或 `The materialized view is disabled` 则说明改配置被设置为了 false，创建物化视图功能关闭了。可以通过修改配置为 true 来启动创建物化视图功能。
+
+该变量为动态配置，用户可以在 FE 进程启动后，通过命令修改配置。也可以通过修改 FE 的配置文件，重启 FE 来生效。
+
 ### `enable_metric_calculator`
 
 ### `enable_spilling`
@@ -583,3 +589,10 @@ thrift_client_timeout_ms 的值被设置为大于0来避免线程卡在java.net.
 
 ### `with_k8s_certs`
 
+### `enable_strict_storage_medium`
+
+该配置表示在建表时，检查集群中是否存在相应的存储介质。例如当用户指定建表时存储介质为`SSD`，但此时集群中只存在`HDD`的磁盘时,
+
+若该参数为`True`，则建表时会报错 `Failed to find enough host in all backends with storage medium with storage medium is SSD, need 3`.
+
+若该参数为`False`，则建表时不会报错，而是将表建立在存储介质为`HDD`的磁盘上。

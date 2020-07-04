@@ -127,7 +127,7 @@ import org.apache.doris.deploy.DeployManager;
 import org.apache.doris.deploy.impl.AmbariDeployManager;
 import org.apache.doris.deploy.impl.K8sDeployManager;
 import org.apache.doris.deploy.impl.LocalFileDeployManager;
-import org.apache.doris.external.elasticsearch.EsStateStore;
+import org.apache.doris.external.elasticsearch.EsRepository;
 import org.apache.doris.ha.BDBHA;
 import org.apache.doris.ha.FrontendNodeType;
 import org.apache.doris.ha.HAProtocol;
@@ -301,7 +301,7 @@ public class Catalog {
     private Daemon replayer;
     private Daemon timePrinter;
     private Daemon listener;
-    private EsStateStore esStateStore;  // it is a daemon, so add it here
+    private EsRepository esRepository;  // it is a daemon, so add it here
 
     private boolean isFirstTimeStartUp = false;
     private boolean isElectable;
@@ -436,6 +436,11 @@ public class Catalog {
         return this.tabletInvertedIndex;
     }
 
+    // only for test
+    public void setColocateTableIndex(ColocateTableIndex colocateTableIndex) {
+        this.colocateTableIndex = colocateTableIndex;
+    }
+
     public ColocateTableIndex getColocateTableIndex() {
         return this.colocateTableIndex;
     }
@@ -510,7 +515,7 @@ public class Catalog {
         this.auth = new PaloAuth();
         this.domainResolver = new DomainResolver(auth);
 
-        this.esStateStore = new EsStateStore();
+        this.esRepository = new EsRepository();
 
         this.metaContext = new MetaContext();
         this.metaContext.setThreadLocalInfo();
@@ -1290,7 +1295,7 @@ public class Catalog {
         // load and export job label cleaner thread
         labelCleaner.start();
         // ES state store
-        esStateStore.start();
+        esRepository.start();
         // domain resolver
         domainResolver.start();
     }
@@ -1452,7 +1457,7 @@ public class Catalog {
             // ATTN: this should be done after load Db, and before loadAlterJob
             recreateTabletInvertIndex();
             // rebuild es state state
-            esStateStore.loadTableFromCatalog();
+            esRepository.loadTableFromCatalog();
 
             checksum = loadLoadJob(dis, checksum);
             checksum = loadAlterJob(dis, checksum);
@@ -1460,6 +1465,7 @@ public class Catalog {
             checksum = loadGlobalVariable(dis, checksum);
             checksum = loadCluster(dis, checksum);
             checksum = loadBrokers(dis, checksum);
+            checksum = loadResources(dis, checksum);
             checksum = loadExportJob(dis, checksum);
             checksum = loadBackupHandler(dis, checksum);
             checksum = loadPaloAuth(dis, checksum);
@@ -1468,8 +1474,6 @@ public class Catalog {
             checksum = loadColocateTableIndex(dis, checksum);
             checksum = loadRoutineLoadJobs(dis, checksum);
             checksum = loadLoadJobsV2(dis, checksum);
-            // TODO(wyb): spark-load
-            //checksum = loadResources(dis, checksum);
             checksum = loadSmallFiles(dis, checksum);
             checksum = loadPlugins(dis, checksum);
             checksum = loadDeleteHandler(dis, checksum);
@@ -1542,6 +1546,7 @@ public class Catalog {
             isDefaultClusterCreated = dis.readBoolean();
         }
 
+        LOG.info("finished replay header from image");
         return newChecksum;
     }
 
@@ -1552,6 +1557,7 @@ public class Catalog {
         masterHttpPort = dis.readInt();
         newChecksum ^= masterHttpPort;
 
+        LOG.info("finished replay masterInfo from image");
         return newChecksum;
     }
 
@@ -1576,6 +1582,7 @@ public class Catalog {
             }
             return newChecksum;
         }
+        LOG.info("finished replay frontends from image");
         return checksum;
     }
 
@@ -1593,7 +1600,7 @@ public class Catalog {
             }
             globalTransactionMgr.addDatabaseTransactionMgr(db.getId());
         }
-
+        LOG.info("finished replay databases from image");
         return newChecksum;
     }
 
@@ -1679,6 +1686,7 @@ public class Catalog {
             }
         }
 
+        LOG.info("finished replay loadJob from image");
         return newChecksum;
     }
 
@@ -1695,7 +1703,7 @@ public class Catalog {
                 exportMgr.unprotectAddJob(job);
             }
         }
-
+        LOG.info("finished replay exportJob from image");
         return newChecksum;
     }
 
@@ -1710,6 +1718,7 @@ public class Catalog {
                 newChecksum = loadAlterJob(dis, newChecksum, type);
             }
         }
+        LOG.info("finished replay alterJob from image");
         return newChecksum;
     }
 
@@ -1796,6 +1805,7 @@ public class Catalog {
             getBackupHandler().readFields(dis);
         }
         getBackupHandler().setCatalog(this);
+        LOG.info("finished replay backupHandler from image");
         return checksum;
     }
 
@@ -1808,6 +1818,7 @@ public class Catalog {
         if (Catalog.getCurrentCatalogJournalVersion() >= FeMetaVersion.VERSION_82) {
             this.deleteHandler = DeleteHandler.read(dis);
         }
+        LOG.info("finished replay deleteHandler from image");
         return checksum;
     }
 
@@ -1821,6 +1832,7 @@ public class Catalog {
             // CAN NOT use PaloAuth.read(), cause this auth instance is already passed to DomainResolver
             auth.readFields(dis);
         }
+        LOG.info("finished replay paloAuth from image");
         return checksum;
     }
 
@@ -1829,6 +1841,7 @@ public class Catalog {
             int size = dis.readInt();
             long newChecksum = checksum ^ size;
             globalTransactionMgr.readFields(dis);
+            LOG.info("finished replay transactionState from image");
             return newChecksum;
         }
         return checksum;
@@ -1847,6 +1860,7 @@ public class Catalog {
                 globalTransactionMgr.addDatabaseTransactionMgr(dbId);
             }
         }
+        LOG.info("finished replay recycleBin from image");
         return checksum;
     }
 
@@ -1854,6 +1868,7 @@ public class Catalog {
         if (Catalog.getCurrentCatalogJournalVersion() >= FeMetaVersion.VERSION_46) {
             Catalog.getCurrentColocateIndex().readFields(dis);
         }
+        LOG.info("finished replay colocateTableIndex from image");
         return checksum;
     }
 
@@ -1861,6 +1876,7 @@ public class Catalog {
         if (Catalog.getCurrentCatalogJournalVersion() >= FeMetaVersion.VERSION_49) {
             Catalog.getCurrentCatalog().getRoutineLoadManager().readFields(dis);
         }
+        LOG.info("finished replay routineLoadJobs from image");
         return checksum;
     }
 
@@ -1868,17 +1884,15 @@ public class Catalog {
         if (Catalog.getCurrentCatalogJournalVersion() >= FeMetaVersion.VERSION_50) {
             loadManager.readFields(in);
         }
+        LOG.info("finished replay loadJobsV2 from image");
         return checksum;
     }
 
     public long loadResources(DataInputStream in, long checksum) throws IOException {
-        // TODO(wyb): spark-load
-        /*
-        if (MetaContext.get().getMetaVersion() >= FeMetaVersion.new_version_by_wyb) {
-            resourceMgr = ResourceMgr.read(in); 
+        if (Catalog.getCurrentCatalogJournalVersion() >= FeMetaVersion.VERSION_87) {
+            resourceMgr = ResourceMgr.read(in);
         }
         LOG.info("finished replay resources from image");
-         */
         return checksum;
     }
 
@@ -1886,6 +1900,7 @@ public class Catalog {
         if (Catalog.getCurrentCatalogJournalVersion() >= FeMetaVersion.VERSION_52) {
             smallFileMgr.readFields(in);
         }
+        LOG.info("finished replay smallFiles from image");
         return checksum;
     }
 
@@ -1927,6 +1942,7 @@ public class Catalog {
             checksum = saveGlobalVariable(dos, checksum);
             checksum = saveCluster(dos, checksum);
             checksum = saveBrokers(dos, checksum);
+            checksum = saveResources(dos, checksum);
             checksum = saveExportJob(dos, checksum);
             checksum = saveBackupHandler(dos, checksum);
             checksum = savePaloAuth(dos, checksum);
@@ -1934,8 +1950,6 @@ public class Catalog {
             checksum = saveColocateTableIndex(dos, checksum);
             checksum = saveRoutineLoadJobs(dos, checksum);
             checksum = saveLoadJobsV2(dos, checksum);
-            // TODO(wyb): spark-load
-            //checksum = saveResources(dos, checksum);
             checksum = saveSmallFiles(dos, checksum);
             checksum = savePlugins(dos, checksum);
             checksum = saveDeleteHandler(dos, checksum);
@@ -2190,6 +2204,7 @@ public class Catalog {
         if (Catalog.getCurrentCatalogJournalVersion() >= FeMetaVersion.VERSION_22) {
             VariableMgr.read(in);
         }
+        LOG.info("finished replay globalVariable from image");
         return checksum;
     }
 
@@ -4287,7 +4302,11 @@ public class Catalog {
                 if (chooseBackendsArbitrary) {
                     // This is the first colocate table in the group, or just a normal table,
                     // randomly choose backends
-                    chosenBackendIds = chosenBackendIdBySeq(replicationNum, clusterName);
+                    if (Config.enable_strict_storage_medium_check) {
+                        chosenBackendIds = chosenBackendIdBySeq(replicationNum, clusterName, tabletMeta.getStorageMedium());
+                    } else {
+                        chosenBackendIds = chosenBackendIdBySeq(replicationNum, clusterName);
+                    }
                     backendsPerBucketSeq.add(chosenBackendIds);
                 } else {
                     // get backends from existing backend sequence
@@ -4304,7 +4323,7 @@ public class Catalog {
                 Preconditions.checkState(chosenBackendIds.size() == replicationNum, chosenBackendIds.size() + " vs. "+ replicationNum);
             }
 
-            if (backendsPerBucketSeq != null && groupId != null) {
+            if (groupId != null) {
                 colocateIndex.addBackendsPerBucketSeq(groupId, backendsPerBucketSeq);
             }
 
@@ -4314,6 +4333,15 @@ public class Catalog {
     }
 
     // create replicas for tablet with random chosen backends
+    private List<Long> chosenBackendIdBySeq(int replicationNum, String clusterName, TStorageMedium storageMedium) throws DdlException {
+        List<Long> chosenBackendIds = Catalog.getCurrentSystemInfo().seqChooseBackendIdsByStorageMedium(replicationNum,
+                true, true, clusterName, storageMedium);
+        if (chosenBackendIds == null) {
+            throw new DdlException("Failed to find enough host with storage medium is " + storageMedium + " in all backends. need: " + replicationNum);
+        }
+        return chosenBackendIds;
+    }
+
     private List<Long> chosenBackendIdBySeq(int replicationNum, String clusterName) throws DdlException {
         List<Long> chosenBackendIds = Catalog.getCurrentSystemInfo().seqChooseBackendIds(replicationNum, true, true, clusterName);
         if (chosenBackendIds == null) {
@@ -4376,7 +4404,7 @@ public class Catalog {
         }
 
         if (table.getType() == TableType.ELASTICSEARCH) {
-            esStateStore.deRegisterTable(tableId);
+            esRepository.deRegisterTable(tableId);
         } else if (table.getType() == TableType.OLAP) {
             // drop all temp partitions of this table, so that there is no temp partitions in recycle bin,
             // which make things easier.
@@ -4828,8 +4856,8 @@ public class Catalog {
         return this.masterIp;
     }
 
-    public EsStateStore getEsStateStore() {
-        return this.esStateStore;
+    public EsRepository getEsRepository() {
+        return this.esRepository;
     }
 
     public void setMaster(MasterInfo info) {
@@ -5008,12 +5036,9 @@ public class Catalog {
         }
 
         // check if rollup has same name
-        if (table.getType() == TableType.OLAP) {
-            OlapTable olapTable = (OlapTable) table;
-            for (String idxName: olapTable.getIndexNameToId().keySet()) {
-                if (idxName.equals(newTableName)) {
-                    throw new DdlException("New name conflicts with rollup index name: " + idxName);
-                }
+        for (String idxName : table.getIndexNameToId().keySet()) {
+            if (idxName.equals(newTableName)) {
+                throw new DdlException("New name conflicts with rollup index name: " + idxName);
             }
         }
 
@@ -6091,6 +6116,7 @@ public class Catalog {
                 nameToCluster.put(cluster.getName(), cluster);
             }
         }
+        LOG.info("finished replay cluster from image");
         return checksum;
     }
 
@@ -6640,7 +6666,7 @@ public class Catalog {
         if (Catalog.getCurrentCatalogJournalVersion() >= FeMetaVersion.VERSION_78) {
             Catalog.getCurrentPluginMgr().readFields(dis);
         }
-
+        LOG.info("finished replay plugins from image");
         return checksum;
     }
 

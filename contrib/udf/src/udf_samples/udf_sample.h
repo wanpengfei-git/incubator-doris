@@ -15,15 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.doris.external.elasticsearch;
+#pragma once
 
-import org.apache.doris.common.UserException;
+#include "udf.h"
 
-public class ExternalDataSourceException extends UserException {
+namespace doris_udf {
 
-    private static final long serialVersionUID = 7912833584319374692L;
+IntVal AddUdf(FunctionContext* context, const IntVal& arg1, const IntVal& arg2);
 
-    public ExternalDataSourceException(String msg) {
-        super(msg);
-    }
+/// --- Prepare / Close Functions ---
+/// ---------------------------------
+
+/// The UDF can optionally include a prepare function. The prepare function is called
+/// before any calls to the UDF to evaluate values.
+void AddUdfPrepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+/// The UDF can also optionally include a close function. The close function is called 
+/// after all calls to the UDF have completed.
+void AddUdfClose(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
 }
