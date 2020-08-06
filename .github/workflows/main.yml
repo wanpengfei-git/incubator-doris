@@ -25,7 +25,6 @@ jobs:
       - name: install dependency
         run: sudo apt-get install g++ ant cmake zip byacc flex automake libtool binutils-dev libiberty-dev bison python2.7 libncurses5-dev lsb-release mlocate
       
-        
       - name: Cache java dependency
         uses: actions/cache@v2
         with:
